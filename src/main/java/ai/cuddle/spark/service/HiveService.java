@@ -59,19 +59,45 @@ public class HiveService implements Serializable{
 
     }
 
-    public List<Map<String,Object>> brandSales(){
-        logger.info("inside fetch brandSales....");
+    public List<Map<String,Object>> brandSales(String brand){
+        logger.info("inside fetch brandSales for ...." + brand);
         List<String> stringDataset= null;
         List<Map<String,Object>> result= new ArrayList<>();
         try {
-            sparkSession.sql("show databases ").show();
-            Dataset<Row> sqlDF = sparkSession.sql("SELECT tdrimssales,stcimssales,itemquantity,brand FROM test.imssales_parque where the_year=2017");
+            //sparkSession.sql("show databases ").show();
+            Dataset<Row> sqlDF = sparkSession.sql("SELECT tdrimssales,stcimssales,itemquantity,brand FROM test.imssales_parque where the_year=2017 and brand="+brand);
             sqlDF.createOrReplaceTempView("imssales_parque");
             System.out.println("cache -----> " + sparkSession.catalog().isCached("imssales_parque"));
-            Dataset<Row> grpDataSet = sparkSession.sql("SELECT sum(tdrimssales) as tdrimssales ,sum(stcimssales) as stcimssales,sum(itemquantity) as itemquantity,brand FROM imssales_parque where brand='CARDINAL' group by brand");
+            Dataset<Row> grpDataSet = sparkSession.sql("SELECT sum(tdrimssales) as tdrimssales ,sum(stcimssales) as stcimssales,sum(itemquantity) as itemquantity,brand FROM imssales_parque where brand= " + brand +" group by brand");
             //RelationalGroupedDataset groupedDataset = sqlDF.groupBy(col("brand"));
             //Dataset<Row> grpDataSet = groupedDataset.agg(sum("tdrimssales").cast(DataTypes.createDecimalType(32,2)).alias("tdrimssales"),sum("stcimssales").cast(DataTypes.createDecimalType(32,2)).alias("stcimssales") ,sum("itemquantity").alias("item")).toDF();
 
+            stringDataset = grpDataSet.toJSON().collectAsList();
+            for(String s : stringDataset){
+                Map<String,Object> map = new HashMap<>();
+                map = mapper.readValue(s, new TypeReference<Map<String, String>>(){});
+                result.add(map);
+            }
+
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+
+        return result;
+
+    }
+
+    public List<Map<String,Object>> sales(){
+        logger.info("getting sales of all the brands....");
+        List<String> stringDataset= null;
+        List<Map<String,Object>> result= new ArrayList<>();
+        try {
+            Dataset<Row> sqlDF = sparkSession.sql("SELECT tdrimssales,stcimssales,itemquantity,brand FROM test.imssales_parque where the_year=2017");
+            sqlDF.createOrReplaceTempView("imssales_parque");
+            System.out.println("cache -----> " + sparkSession.catalog().isCached("imssales_parque"));
+            Dataset<Row> grpDataSet = sparkSession.sql("SELECT sum(tdrimssales) as tdrimssales ,sum(stcimssales) as stcimssales,sum(itemquantity) as itemquantity,brand FROM imssales_parque group by brand");
+            //RelationalGroupedDataset groupedDataset = sqlDF.groupBy(col("brand"));
+            //Dataset<Row> grpDataSet = groupedDataset.agg(sum("tdrimssales").cast(DataTypes.createDecimalType(32,2)).alias("tdrimssales"),sum("stcimssales").cast(DataTypes.createDecimalType(32,2)).alias("stcimssales") ,sum("itemquantity").alias("item")).toDF();
 
             stringDataset = grpDataSet.toJSON().collectAsList();
             for(String s : stringDataset){

@@ -7,6 +7,7 @@ import ai.cuddle.spark.service.WordCount;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,9 +45,14 @@ public class ApiController {
         return new ResponseEntity<>(jdbcService.fetchMaxSalaryEmployee(),HttpStatus.OK);
     }
 
-    @RequestMapping("/brandSales")
-    public ResponseEntity<List<Map<String,Object>>> brandSales() {
-        return new ResponseEntity<>(hiveService.brandSales(),HttpStatus.OK);
+    @RequestMapping("/sales/{brand}")
+    public ResponseEntity<List<Map<String,Object>>> brandSales(@PathVariable("brand") String brand) {
+        return new ResponseEntity<>(hiveService.brandSales(brand),HttpStatus.OK);
+    }
+
+    @RequestMapping("/sales")
+    public ResponseEntity<List<Map<String,Object>>> sales() {
+        return new ResponseEntity<>(hiveService.sales(),HttpStatus.OK);
     }
 
     @RequestMapping("/save")
