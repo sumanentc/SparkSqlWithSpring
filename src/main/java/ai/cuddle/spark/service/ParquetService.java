@@ -4,11 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.log4j.Logger;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Properties;
 
@@ -43,5 +45,28 @@ public class ParquetService implements Serializable {
             e.printStackTrace();
         }
 
+    }
+
+
+    public void loadData()throws URISyntaxException{
+
+                /*.format("com.springml.spark.sftp")
+                                                 .option("host", "localhost")
+                                                  .option("username", "suman.das")
+                                                  .option("password", "fractal@123")
+                                                  .option("delimiter", ",")
+                                                  .option("fileType", "csv").
+                                                   option("inferSchema", "true").
+                                                   option("header", "true").
+                                                    option("port","21").
+                                                    load("/Users/suman.das/Public/newstoreglidepath.csv");*/
+        //final URI ftpURI = new URI("ftp", "cuddleuser:Cu4", "ftp", 21, "/uploads/test.csv", null, null);
+        Dataset<Row> data = sparkSession.read().format("csv").option("header","true").option("delimiter", ";").option("mode", "DROPMALFORMED").load("/Users/suman.das/Documents/hadoop/input/cuddle/td/test.csv");
+                //.option("","")
+                //.textFile("ftp://das:frac@localhost/Users/suman.das/Public/newstoreglidepath.csv");
+        data.show(10);
+        data.write().mode(SaveMode.Append).format("parquet").insertInto("test.newstoreglidepath");
+
+        logger.info("Saving data done.....");
     }
 }

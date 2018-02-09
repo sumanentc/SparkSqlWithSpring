@@ -1,5 +1,10 @@
 package ai.cuddle.spark.service;
 
+import com.cloudera.sparkts.BusinessDayFrequency;
+import com.cloudera.sparkts.DateTimeIndex;
+import com.cloudera.sparkts.api.java.DateTimeIndexFactory;
+import com.cloudera.sparkts.api.java.JavaTimeSeriesRDD;
+import com.cloudera.sparkts.api.java.JavaTimeSeriesRDDFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.log4j.Logger;
@@ -7,15 +12,18 @@ import org.apache.spark.sql.DataFrameReader;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalog.Column;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.Metadata;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
-import org.apache.spark.storage.StorageLevel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.*;
 
 /**
@@ -65,10 +73,10 @@ public class HiveService implements Serializable{
         List<Map<String,Object>> result= new ArrayList<>();
         try {
             //sparkSession.sql("show databases ").show();
-            Dataset<Row> sqlDF = sparkSession.sql("SELECT tdrimssales,stcimssales,itemquantity,brand FROM test.imssales_parque where the_year=2017 and brand="+brand);
+            Dataset<Row> sqlDF = sparkSession.sql("SELECT tdrimssales,stcimssales,itemquantity,brand FROM test.imssales_parque where the_year=2017 and brand='"+brand +"'");
             sqlDF.createOrReplaceTempView("imssales_parque");
             System.out.println("cache -----> " + sparkSession.catalog().isCached("imssales_parque"));
-            Dataset<Row> grpDataSet = sparkSession.sql("SELECT sum(tdrimssales) as tdrimssales ,sum(stcimssales) as stcimssales,sum(itemquantity) as itemquantity,brand FROM imssales_parque where brand= " + brand +" group by brand");
+            Dataset<Row> grpDataSet = sparkSession.sql("SELECT sum(tdrimssales) as tdrimssales ,sum(stcimssales) as stcimssales,sum(itemquantity) as itemquantity,brand FROM imssales_parque where brand='" + brand +"' group by brand");
             //RelationalGroupedDataset groupedDataset = sqlDF.groupBy(col("brand"));
             //Dataset<Row> grpDataSet = groupedDataset.agg(sum("tdrimssales").cast(DataTypes.createDecimalType(32,2)).alias("tdrimssales"),sum("stcimssales").cast(DataTypes.createDecimalType(32,2)).alias("stcimssales") ,sum("itemquantity").alias("item")).toDF();
 
@@ -92,19 +100,36 @@ public class HiveService implements Serializable{
         List<String> stringDataset= null;
         List<Map<String,Object>> result= new ArrayList<>();
         try {
-            Dataset<Row> sqlDF = sparkSession.sql("SELECT tdrimssales,stcimssales,itemquantity,brand FROM test.imssales_parque where the_year=2017");
+            Dataset<Row> sqlDF = sparkSession.sql("SELECT tdrimssales,stcimssales,itemquantity,brand,the_date FROM test.imssales_parque where the_year=2017 and the_month='JANUARY' and day_of_month<=20");
             sqlDF.createOrReplaceTempView("imssales_parque");
             System.out.println("cache -----> " + sparkSession.catalog().isCached("imssales_parque"));
-            Dataset<Row> grpDataSet = sparkSession.sql("SELECT sum(tdrimssales) as tdrimssales ,sum(stcimssales) as stcimssales,sum(itemquantity) as itemquantity,brand FROM imssales_parque group by brand");
+            //Dataset<Row> grpDataSet = sparkSession.sql("SELECT sum(tdrimssales) as tdrimssales ,sum(stcimssales) as stcimssales,sum(itemquantity) as itemquantity,brand FROM imssales_parque group by brand");
             //RelationalGroupedDataset groupedDataset = sqlDF.groupBy(col("brand"));
             //Dataset<Row> grpDataSet = groupedDataset.agg(sum("tdrimssales").cast(DataTypes.createDecimalType(32,2)).alias("tdrimssales"),sum("stcimssales").cast(DataTypes.createDecimalType(32,2)).alias("stcimssales") ,sum("itemquantity").alias("item")).toDF();
-
+            /*
             stringDataset = grpDataSet.toJSON().collectAsList();
             for(String s : stringDataset){
                 Map<String,Object> map = new HashMap<>();
                 map = mapper.readValue(s, new TypeReference<Map<String, String>>(){});
                 result.add(map);
             }
+            */
+            // Create an daily DateTimeIndex over August and September 2015
+            ZoneId zone = ZoneId.systemDefault();
+            DateTimeIndex dtIndex = DateTimeIndexFactory.uniformFromInterval(
+                    ZonedDateTime.of(LocalDateTime.parse("2017-01-01T00:00:00"), zone),
+                    ZonedDateTime.of(LocalDateTime.parse("2017-01-31T00:00:00"), zone),
+                    new BusinessDayFrequency(1, 0));
+
+            // Align the ticker data on the DateTimeIndex to create a TimeSeriesRDD
+
+            //JavaTimeSeriesRDD tickerTsrdd = JavaTimeSeriesRDDFactory.timeSeriesRDDFromObservations(dtIndex, tickerObs, "timestamp", "symbol", "price");
+            JavaTimeSeriesRDD tickerTsrdd = JavaTimeSeriesRDDFactory.timeSeriesRDDFromPython(dtIndex,sqlDF.javaToPython());
+
+            // Impute missing values using linear interpolation
+            JavaTimeSeriesRDD<String> filled = tickerTsrdd.fill("linear");
+            filled.collect();
+
 
         }catch(Exception e){
             e.printStackTrace();
@@ -115,10 +140,19 @@ public class HiveService implements Serializable{
     }
 
     public void buildCache(){
-        Dataset<Row> sqlDF = sparkSession.sql("SELECT tdrimssales,stcimssales,itemquantity,brand FROM test.imssales_parque where the_year=2017");
-        sqlDF.persist(StorageLevel.MEMORY_AND_DISK());
-        sqlDF.createOrReplaceTempView("imssales_parque");
-        sparkSession.sql("cache table imssales_parque");
+        //Dataset<Row> sqlDF = sparkSession.sql("SELECT tdrimssales,stcimssales,itemquantity,brand FROM test.imssales_parque where the_year=2017");
+        //sqlDF.persist(StorageLevel.MEMORY_AND_DISK());
+        //sqlDF.createOrReplaceTempView("imssales_parque");
+        //sparkSession.sql("cache table imssales_parque");
+        try {
+            Dataset<org.apache.spark.sql.catalog.Column> columnDataset = sparkSession.catalog().listColumns("test", "imssales_parque");
+            logger.info("Columns : " + columnDataset);
+            List<Column> columnList= columnDataset.collectAsList();
+            logger.info("Columns : " + columnList);
+
+        }catch(Exception e){
+            e.printStackTrace();
+        }
 
 
     }

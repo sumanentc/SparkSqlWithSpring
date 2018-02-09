@@ -1,15 +1,12 @@
 package ai.cuddle.spark.controler;
 
 import ai.cuddle.spark.entity.Count;
-import ai.cuddle.spark.service.HiveService;
-import ai.cuddle.spark.service.JDBCService;
-import ai.cuddle.spark.service.WordCount;
+import ai.cuddle.spark.entity.request.Analysis;
+import ai.cuddle.spark.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
@@ -29,6 +26,12 @@ public class ApiController {
 
     @Autowired
     HiveService hiveService;
+
+    @Autowired
+    DataApiService dataApiService;
+
+    @Autowired
+    ParquetService parquetService;
 
     @RequestMapping("/wordcount")
     public ResponseEntity<List<Count>> words() {
@@ -55,9 +58,15 @@ public class ApiController {
         return new ResponseEntity<>(hiveService.sales(),HttpStatus.OK);
     }
 
+    @RequestMapping(value="/fetchData",method = RequestMethod.POST)
+    public ResponseEntity<List<Map<String,Object>>> fetchData(@RequestBody Analysis analysis) {
+        return new ResponseEntity<>(dataApiService.fetchData(analysis),HttpStatus.OK);
+    }
+
     @RequestMapping("/save")
-    public ResponseEntity saveData() {
-        jdbcService.loadCSV();
+    public ResponseEntity saveData() throws Exception{
+        //jdbcService.loadCSV();
+        parquetService.loadData();
         return new ResponseEntity<>(HttpStatus.OK);
     }
 

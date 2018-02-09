@@ -41,9 +41,9 @@ public class ApplicationConfig {
         return SparkSession
                 .builder()
                 //.sparkContext(javaSparkContext().sc())
-                //.config("spark.sql.warehouse.dir","/Users/suman.das/Documents/spark/data")
+                .config("spark.sql.warehouse.dir","/Users/suman.das/Documents/spark/data")
                 .config(sparkConf())
-                .config("spark.sql.warehouse.dir","/Users/suman.das/Documents/hive/user/hive/warehouse")
+                //.config("spark.sql.warehouse.dir","/Users/suman.das/Documents/hive/user/hive/warehouse")
                 .config("hive.metastore.uris","thrift://localhost:9083")
                 .config("spark.sql.hive.convertMetastoreOrc","false")
                 .enableHiveSupport()
